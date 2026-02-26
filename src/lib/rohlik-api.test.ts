@@ -194,7 +194,7 @@ describe('RohlikAPI', () => {
       expect(orders[59].id).toBe('60');
 
       // Check pagination URLs (call 0 = login, call 1 = page 1, call 2 = page 2)
-      const urls = fetchSpy.mock.calls.map((c) => c[0]);
+      const urls = fetchSpy.mock.calls.map((c: unknown[]) => c[0]);
       expect(urls[1]).toBe(
         'https://www.rohlik.cz/api/v3/orders/delivered?offset=0&limit=50',
       );

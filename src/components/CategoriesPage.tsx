@@ -27,12 +27,13 @@ function fmtD(n: number) {
 interface Props {
   filteredData: FilteredData;
   onShowDetail: (pid: string) => void;
+  initialDrill?: string[];
 }
 
 const CAT_KEYS = ['c0', 'c1', 'c2'] as const;
 
-export default function CategoriesPage({ filteredData, onShowDetail }: Props) {
-  const [catDrill, setCatDrill] = useState<string[]>([]);
+export default function CategoriesPage({ filteredData, onShowDetail, initialDrill }: Props) {
+  const [catDrill, setCatDrill] = useState<string[]>(initialDrill ?? []);
   const level = catDrill.length;
 
   const matching = useMemo(() => {

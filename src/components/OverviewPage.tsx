@@ -29,9 +29,10 @@ interface Props {
   filteredMonthly: FilteredMonthly;
   onShowDetail: (pid: string) => void;
   onMonthClick: (month: string) => void;
+  onCategoryClick?: (categoryName: string) => void;
 }
 
-export default function OverviewPage({ filteredData, filteredMonthly, onShowDetail, onMonthClick }: Props) {
+export default function OverviewPage({ filteredData, filteredMonthly, onShowDetail, onMonthClick, onCategoryClick }: Props) {
   const totalSpend = useMemo(
     () => Object.values(filteredMonthly).reduce((s, v) => s + v[1], 0),
     [filteredMonthly]
@@ -119,7 +120,12 @@ export default function OverviewPage({ filteredData, filteredMonthly, onShowDeta
         grid: { display: false },
       },
     },
-  }), []);
+    onClick: (_e: unknown, els: Array<{ index: number }>) => {
+      if (els.length && onCategoryClick) {
+        onCategoryClick(topCats[els[0].index][0]);
+      }
+    },
+  }), [topCats, onCategoryClick]);
 
   // Top products
   const topProds = useMemo(() => {

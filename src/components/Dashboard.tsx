@@ -106,8 +106,17 @@ export default function Dashboard({ data }: Props) {
     setDetailPid(null);
   }, []);
 
+  const [categoryDrill, setCategoryDrill] = useState<string[] | undefined>(undefined);
+
   const handleTabSwitch = useCallback((tab: Tab) => {
     setActiveTab(tab);
+    setDetailPid(null);
+    if (tab !== 'categories') setCategoryDrill(undefined);
+  }, []);
+
+  const handleCategoryClick = useCallback((categoryName: string) => {
+    setCategoryDrill([categoryName]);
+    setActiveTab('categories');
     setDetailPid(null);
   }, []);
 
@@ -217,12 +226,15 @@ export default function Dashboard({ data }: Props) {
           filteredMonthly={filteredMonthly}
           onShowDetail={showDetail}
           onMonthClick={handleMonthClick}
+          onCategoryClick={handleCategoryClick}
         />
       )}
       {activeTab === 'categories' && (
         <CategoriesPage
           filteredData={filteredData}
           onShowDetail={showDetail}
+          key={categoryDrill?.join('/') ?? 'default'}
+          initialDrill={categoryDrill}
         />
       )}
       {activeTab === 'products' && (
