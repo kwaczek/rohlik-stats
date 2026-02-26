@@ -70,6 +70,7 @@ export default function ProductDetail({ product, filtered, onBack }: Props) {
     datasets: [
       {
         type: 'bar' as const,
+        label: 'Utrata (Kc)',
         data: sortedMonths.map((m) => fp.h[m][1]),
         backgroundColor: 'rgba(74,222,128,0.3)',
         borderColor: '#4ade80',
@@ -79,6 +80,7 @@ export default function ProductDetail({ product, filtered, onBack }: Props) {
       },
       {
         type: 'line' as const,
+        label: 'Mnozstvi',
         data: sortedMonths.map((m) => fp.h[m][0]),
         borderColor: '#3b82f6',
         pointRadius: 3,

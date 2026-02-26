@@ -37,10 +37,12 @@ export default function CategoriesPage({ filteredData, onShowDetail, initialDril
   const level = catDrill.length;
 
   const matching = useMemo(() => {
+    // Compare category values, treating empty string as "Ostatni"
+    const catVal = (v: string) => v || 'Ostatni';
     return Object.entries(filteredData).filter(([, p]) => {
-      if (level >= 1 && p.c0 !== catDrill[0]) return false;
-      if (level >= 2 && p.c1 !== catDrill[1]) return false;
-      if (level >= 3 && p.c2 !== catDrill[2]) return false;
+      if (level >= 1 && catVal(p.c0) !== catDrill[0]) return false;
+      if (level >= 2 && catVal(p.c1) !== catDrill[1]) return false;
+      if (level >= 3 && catVal(p.c2) !== catDrill[2]) return false;
       return true;
     });
   }, [filteredData, catDrill, level]);
