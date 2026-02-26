@@ -1,10 +1,41 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 type Phase = 'idle' | 'loading' | 'error';
+
+const SCREENSHOTS = [
+  {
+    src: '/screenshots/overview.png',
+    alt: 'Prehled mesicnich utrat',
+    title: 'Mesicni utraty',
+    desc: 'Celkovy prehled kolik utracite za nakupy kazdy mesic',
+    wide: true,
+  },
+  {
+    src: '/screenshots/categories.png',
+    alt: 'Kategorie produktu',
+    title: 'Kategorie',
+    desc: 'Rozdeleni utrat do kategorii s moznosti zanoreni',
+    wide: false,
+  },
+  {
+    src: '/screenshots/product-detail.png',
+    alt: 'Detail produktu',
+    title: 'Detail produktu',
+    desc: 'Historie nakupu a ceny kazdeho produktu',
+    wide: false,
+  },
+  {
+    src: '/screenshots/price-trend.png',
+    alt: 'Vyvoj ceny',
+    title: 'Cenove trendy',
+    desc: 'Jak se menila cena vasich oblibenych produktu v case',
+    wide: true,
+  },
+];
 
 export default function LandingPage() {
   const router = useRouter();
@@ -14,6 +45,25 @@ export default function LandingPage() {
   const [progress, setProgress] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState('');
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+
+  const openLightbox = (idx: number) => setLightboxIdx(idx);
+  const closeLightbox = () => setLightboxIdx(null);
+  const prevImage = () =>
+    setLightboxIdx((i) => (i !== null ? (i - 1 + SCREENSHOTS.length) % SCREENSHOTS.length : null));
+  const nextImage = () =>
+    setLightboxIdx((i) => (i !== null ? (i + 1) % SCREENSHOTS.length : null));
+
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === 'ArrowRight') nextImage();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  });
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,11 +140,15 @@ export default function LandingPage() {
         <div className="hero-form">
           <div className="landing-card">
             <h2>Zobrazit statistiky</h2>
+            <p className="form-info">
+              Pouzijte sve prihlasovaci udaje z <strong>Rohlik.cz</strong> &mdash;
+              stejny email a heslo, kterym se prihlasujete do e-shopu.
+            </p>
 
             {phase === 'idle' || phase === 'error' ? (
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>Email</label>
+                  <label>Rohlik email</label>
                   <input
                     type="email"
                     value={email}
@@ -104,7 +158,7 @@ export default function LandingPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Heslo</label>
+                  <label>Rohlik heslo</label>
                   <input
                     type="password"
                     value={password}
@@ -117,7 +171,7 @@ export default function LandingPage() {
                 </button>
                 {error && <div className="error-message">{error}</div>}
                 <div className="form-hint">
-                  Heslo se nikam neuklada. Pouzije se jednоrazove pro stazeni dat z Rohliku.
+                  Heslo se nikam neuklada. Pouzije se jednorazove pro stazeni dat z Rohliku.
                 </div>
               </form>
             ) : (
@@ -139,60 +193,70 @@ export default function LandingPage() {
       <section className="showcase">
         <h2>Co vsechno uvidite</h2>
         <div className="showcase-grid">
-          <div className="showcase-item showcase-item-wide">
-            <Image
-              src="/screenshots/overview.png"
-              alt="Prehled mesicnich utrat"
-              width={1200}
-              height={800}
-              className="showcase-img"
-            />
-            <div className="showcase-label">
-              <strong>Mesicni utraty</strong>
-              <span>Celkovy prehled kolik utracite za nakupy kazdy mesic</span>
+          {SCREENSHOTS.map((s, i) => (
+            <div
+              key={s.src}
+              className={`showcase-item${s.wide ? ' showcase-item-wide' : ''}`}
+              onClick={() => openLightbox(i)}
+            >
+              <Image
+                src={s.src}
+                alt={s.alt}
+                width={s.wide ? 1200 : 800}
+                height={s.wide ? (i === 0 ? 800 : 400) : (i === 2 ? 600 : 300)}
+                className="showcase-img"
+              />
+              <div className="showcase-label">
+                <strong>{s.title}</strong>
+                <span>{s.desc}</span>
+              </div>
             </div>
-          </div>
-          <div className="showcase-item">
-            <Image
-              src="/screenshots/categories.png"
-              alt="Kategorie produktu"
-              width={800}
-              height={300}
-              className="showcase-img"
-            />
-            <div className="showcase-label">
-              <strong>Kategorie</strong>
-              <span>Rozdeleni utrat do kategorii s moznosti zanoreni</span>
-            </div>
-          </div>
-          <div className="showcase-item">
-            <Image
-              src="/screenshots/product-detail.png"
-              alt="Detail produktu"
-              width={800}
-              height={600}
-              className="showcase-img"
-            />
-            <div className="showcase-label">
-              <strong>Detail produktu</strong>
-              <span>Historie nakupu a ceny kazdeho produktu</span>
-            </div>
-          </div>
-          <div className="showcase-item showcase-item-wide">
-            <Image
-              src="/screenshots/price-trend.png"
-              alt="Vyvoj ceny"
-              width={1200}
-              height={400}
-              className="showcase-img"
-            />
-            <div className="showcase-label">
-              <strong>Cenove trendy</strong>
-              <span>Jak se menila cena vasich oblibenych produktu v case</span>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
+
+      {/* Lightbox */}
+      {lightboxIdx !== null && (
+        <div className="lightbox" onClick={closeLightbox}>
+          <button
+            className="lightbox-close"
+            onClick={(e) => { e.stopPropagation(); closeLightbox(); }}
+            aria-label="Zavrit"
+          >
+            &times;
+          </button>
+          <button
+            className="lightbox-arrow lightbox-prev"
+            onClick={(e) => { e.stopPropagation(); prevImage(); }}
+            aria-label="Predchozi"
+          >
+            &#8249;
+          </button>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <Image
+              src={SCREENSHOTS[lightboxIdx].src}
+              alt={SCREENSHOTS[lightboxIdx].alt}
+              width={1400}
+              height={900}
+              className="lightbox-img"
+            />
+            <div className="lightbox-caption">
+              <strong>{SCREENSHOTS[lightboxIdx].title}</strong>
+              <span>{SCREENSHOTS[lightboxIdx].desc}</span>
+              <span className="lightbox-counter">
+                {lightboxIdx + 1} / {SCREENSHOTS.length}
+              </span>
+            </div>
+          </div>
+          <button
+            className="lightbox-arrow lightbox-next"
+            onClick={(e) => { e.stopPropagation(); nextImage(); }}
+            aria-label="Dalsi"
+          >
+            &#8250;
+          </button>
+        </div>
+      )}
 
       {/* Story section */}
       <section className="story">
@@ -213,7 +277,7 @@ export default function LandingPage() {
             pro vsechny, kteri chteji vedet, kam jejich penize na Rohliku tečou.
           </p>
           <p>
-            Aplikace pouziva vase prihlasovaci udaje <strong>jednоrazove</strong> &mdash; jen pro stazeni
+            Aplikace pouziva vase prihlasovaci udaje <strong>jednorazove</strong> &mdash; jen pro stazeni
             objednavek pres Rohlik API. Heslo se nikde neuklada. Zpracovana data neobsahuji
             zadne osobni udaje. Kod je kompletne otevreny na GitHubu.
           </p>
@@ -268,6 +332,10 @@ export default function LandingPage() {
         </div>
         <div className="footer-copy">
           Vytvoreno, protoze Rohlik tuto funkci nema a podpora ji opakovaně slibila.
+          <br />
+          Napsal jsem to sam s velkou pomoci{' '}
+          <a href="https://claude.ai" target="_blank" rel="noopener">Claude</a>.
+          Co za dobu zit.
         </div>
       </footer>
     </div>
