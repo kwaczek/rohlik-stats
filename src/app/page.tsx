@@ -335,7 +335,7 @@ export default function LandingPage() {
           <br />
           Napsal jsem to sam s velkou pomoci{' '}
           <a href="https://claude.ai" target="_blank" rel="noopener">Claude</a>.
-          Co za dobu zit.
+          What a time to be alive!
         </div>
       </footer>
     </div>
