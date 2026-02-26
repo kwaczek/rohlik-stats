@@ -37,6 +37,9 @@ yarn-error.log*
 # rohlik data files
 rohlikcz_*.json
 
+# local KV store
+.kv-local/
+
 # vercel
 .vercel
 

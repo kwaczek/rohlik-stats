@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import { RohlikAPI, InvalidCredentialsError } from '@/lib/rohlik-api';
 import { processStats } from '@/lib/process-stats';
 import * as crypto from 'crypto';

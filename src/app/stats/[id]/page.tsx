@@ -1,5 +1,5 @@
 import Dashboard from '@/components/Dashboard';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import { notFound } from 'next/navigation';
 import type { StatsData } from '@/lib/stats-types';
 
