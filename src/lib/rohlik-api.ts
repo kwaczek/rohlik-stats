@@ -13,6 +13,15 @@ const BASE_URL = 'https://www.rohlik.cz';
 const RATE_LIMIT_MS = 200;
 const PAGE_SIZE = 50;
 
+const DEFAULT_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'cs-CZ,cs;q=0.9,en;q=0.8',
+  Referer: 'https://www.rohlik.cz/',
+  Origin: 'https://www.rohlik.cz',
+};
+
 // ---------------------------------------------------------------------------
 // Error types
 // ---------------------------------------------------------------------------
@@ -102,6 +111,7 @@ export class RohlikAPI {
     options: RequestInit = {},
   ): Promise<{ data: T; response: Response }> {
     const headers: Record<string, string> = {
+      ...DEFAULT_HEADERS,
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
@@ -128,6 +138,7 @@ export class RohlikAPI {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
+        ...DEFAULT_HEADERS,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
