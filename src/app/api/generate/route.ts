@@ -5,7 +5,7 @@ import { processStats } from '@/lib/process-stats';
 import * as crypto from 'crypto';
 
 export const runtime = 'nodejs'; // Need Node.js for cookie support
-export const maxDuration = 300; // 5 min timeout (Vercel Pro)
+export const maxDuration = 60; // Hobby plan allows up to 60s
 
 /**
  * Transform raw API result into the shape processStats expects.

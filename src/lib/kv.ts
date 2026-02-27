@@ -1,7 +1,7 @@
 /**
  * KV store abstraction.
  *
- * In production (when KV_REST_API_URL is set), uses Vercel KV (Upstash Redis).
+ * In production (when REDIS_URL is set), uses Upstash Redis.
  * In local development, uses a simple file-based store in .kv-local/.
  */
 
@@ -60,33 +60,47 @@ class LocalKV implements KVStore {
   }
 }
 
-/** Lazy-loaded Vercel KV for production */
-let _vercelKV: KVStore | null = null;
+/** Lazy-loaded Upstash Redis for production */
+let _redis: KVStore | null = null;
 
-async function getVercelKV(): Promise<KVStore> {
-  if (!_vercelKV) {
-    const { kv: vercelKv } = await import('@vercel/kv');
-    _vercelKV = vercelKv as unknown as KVStore;
+async function getRedis(): Promise<KVStore> {
+  if (!_redis) {
+    // @upstash/redis fromEnv() reads UPSTASH_REDIS_REST_URL / KV_REST_API_URL
+    const mod = await import('@upstash/redis');
+    const client = mod.Redis.fromEnv();
+    _redis = {
+      get: async <T = unknown>(key: string) => {
+        const val = await client.get<T>(key);
+        return val ?? null;
+      },
+      set: async (key: string, value: unknown, options?: { ex?: number }) => {
+        if (options?.ex) {
+          await client.set(key, value, { ex: options.ex });
+        } else {
+          await client.set(key, value);
+        }
+      },
+    };
   }
-  return _vercelKV;
+  return _redis;
 }
 
-/** Exported KV instance — automatically picks local or Vercel based on env */
+/** Exported KV instance — automatically picks local or Redis based on env */
 function createKV(): KVStore {
-  const isLocal = !process.env.KV_REST_API_URL;
+  const isLocal = !process.env.KV_REST_API_URL && !process.env.UPSTASH_REDIS_REST_URL;
 
   if (isLocal) {
     return new LocalKV();
   }
 
-  // Return a proxy that lazy-loads Vercel KV
+  // Return a proxy that lazy-loads Redis
   return {
     get: async <T = unknown>(key: string) => {
-      const store = await getVercelKV();
+      const store = await getRedis();
       return store.get<T>(key);
     },
     set: async (key: string, value: unknown, options?: { ex?: number }) => {
-      const store = await getVercelKV();
+      const store = await getRedis();
       return store.set(key, value, options);
     },
   };
