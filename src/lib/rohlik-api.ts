@@ -123,7 +123,17 @@ export class RohlikAPI {
     const response = await fetch(url, {
       ...options,
       headers,
+      redirect: 'manual',
     });
+
+    // If we get a redirect or non-JSON response, the session may have expired
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('application/json')) {
+      const preview = await response.text();
+      throw new RohlikAPIError(
+        `Non-JSON response (${response.status} ${contentType}): ${preview.substring(0, 100)}`,
+      );
+    }
 
     return { data: (await response.json()) as T, response };
   }
@@ -146,7 +156,17 @@ export class RohlikAPI {
         password: this.password,
         name: '',
       }),
+      redirect: 'manual',
     });
+
+    // Check for non-JSON response (WAF block, redirect, etc.)
+    const loginContentType = response.headers.get('content-type') ?? '';
+    if (!loginContentType.includes('application/json')) {
+      const preview = await response.text();
+      throw new RohlikAPIError(
+        `Login returned non-JSON (${response.status} ${loginContentType}): ${preview.substring(0, 200)}`,
+      );
+    }
 
     // Capture cookies from Set-Cookie headers
     const setCookieHeaders = response.headers.getSetCookie();
