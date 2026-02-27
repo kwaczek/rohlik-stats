@@ -1,7 +1,7 @@
 /**
  * KV store abstraction.
  *
- * In production (when REDIS_URL is set), uses Upstash Redis.
+ * In production (when REDIS_URL is set), uses Redis via the `redis` package.
  * In local development, uses a simple file-based store in .kv-local/.
  */
 
@@ -25,7 +25,6 @@ class LocalKV implements KVStore {
   }
 
   private filePath(key: string): string {
-    // Replace special chars for filesystem safety
     const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
     return path.join(this.dir, `${safeKey}.json`);
   }
@@ -38,7 +37,6 @@ class LocalKV implements KVStore {
       const raw = fs.readFileSync(fp, 'utf-8');
       const entry = JSON.parse(raw);
 
-      // Check TTL expiry
       if (entry.expiresAt && Date.now() > entry.expiresAt) {
         fs.unlinkSync(fp);
         return null;
@@ -60,24 +58,30 @@ class LocalKV implements KVStore {
   }
 }
 
-/** Lazy-loaded Upstash Redis for production */
+/** Lazy-loaded Redis for production */
 let _redis: KVStore | null = null;
 
 async function getRedis(): Promise<KVStore> {
   if (!_redis) {
-    // @upstash/redis fromEnv() reads UPSTASH_REDIS_REST_URL / KV_REST_API_URL
-    const mod = await import('@upstash/redis');
-    const client = mod.Redis.fromEnv();
+    const { createClient } = await import('redis');
+    const client = createClient({ url: process.env.REDIS_URL });
+    await client.connect();
     _redis = {
       get: async <T = unknown>(key: string) => {
-        const val = await client.get<T>(key);
-        return val ?? null;
+        const val = await client.get(key);
+        if (val === null) return null;
+        try {
+          return JSON.parse(val) as T;
+        } catch {
+          return val as unknown as T;
+        }
       },
       set: async (key: string, value: unknown, options?: { ex?: number }) => {
+        const serialized = JSON.stringify(value);
         if (options?.ex) {
-          await client.set(key, value, { ex: options.ex });
+          await client.set(key, serialized, { EX: options.ex });
         } else {
-          await client.set(key, value);
+          await client.set(key, serialized);
         }
       },
     };
@@ -87,13 +91,12 @@ async function getRedis(): Promise<KVStore> {
 
 /** Exported KV instance — automatically picks local or Redis based on env */
 function createKV(): KVStore {
-  const isLocal = !process.env.KV_REST_API_URL && !process.env.UPSTASH_REDIS_REST_URL;
+  const isLocal = !process.env.REDIS_URL;
 
   if (isLocal) {
     return new LocalKV();
   }
 
-  // Return a proxy that lazy-loads Redis
   return {
     get: async <T = unknown>(key: string) => {
       const store = await getRedis();
