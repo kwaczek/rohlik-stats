@@ -56,6 +56,14 @@ export async function POST(req: NextRequest) {
 
       try {
         const api = new RohlikAPI(email, password);
+        api.onRetry = (attempt, waitSec) => {
+          sendEvent('progress', {
+            phase: 'rate_limit',
+            current: attempt,
+            total: 3,
+            message: `Rohlik omezil pozadavky, cekam ${waitSec}s... (pokus ${attempt}/3)`,
+          });
+        };
 
         // Fetch all data with progress reporting
         const result = await api.fetchAndProcessAll(

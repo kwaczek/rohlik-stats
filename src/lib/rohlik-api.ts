@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 const BASE_URL = 'https://www.rohlik.cz';
-const RATE_LIMIT_MS = 500;
+const RATE_LIMIT_MS = 750;
 const PAGE_SIZE = 50;
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -96,6 +96,7 @@ export class RohlikAPI {
   private email: string;
   private password: string;
   private cookies: string[] = [];
+  public onRetry?: (attempt: number, waitSec: number) => void;
 
   constructor(email: string, password: string) {
     this.email = email;
@@ -120,8 +121,8 @@ export class RohlikAPI {
       headers['Cookie'] = this.cookies.join('; ');
     }
 
-    // Retry with backoff on 429
-    const MAX_RETRIES = 5;
+    // Retry with backoff on 429 — Cloudflare blocks datacenter IPs for ~30-60s
+    const MAX_RETRIES = 3;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const response = await fetch(url, {
         ...options,
@@ -130,8 +131,10 @@ export class RohlikAPI {
       });
 
       if (response.status === 429 && attempt < MAX_RETRIES) {
-        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        await sleep(delay);
+        // Wait 45s on first 429, then 60s, then 90s
+        const delaySec = 45 + attempt * 15;
+        this.onRetry?.(attempt + 1, delaySec);
+        await sleep(delaySec * 1000);
         continue;
       }
 
