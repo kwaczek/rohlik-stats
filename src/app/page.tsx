@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -37,6 +37,269 @@ const SCREENSHOTS = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Client-side proxy helpers
+// ---------------------------------------------------------------------------
+
+const RATE_LIMIT_MS = 200;
+const PAGE_SIZE = 50;
+const CATEGORY_BATCH_SIZE = 20;
+const MAX_429_RETRIES = 5;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+interface ProxyResult {
+  data: unknown;
+  cookies?: string;
+  status: number;
+}
+
+async function proxyCall(
+  path: string,
+  opts: { method?: string; body?: unknown; cookies?: string },
+): Promise<ProxyResult> {
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    const res = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path,
+        method: opts.method ?? 'GET',
+        body: opts.body,
+        cookies: opts.cookies,
+      }),
+    });
+
+    if (res.status === 429) {
+      // Wait and retry — Cloudflare rate limit
+      const wait = 30 + attempt * 15;
+      await sleep(wait * 1000);
+      continue;
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as Record<string, string>).error ?? `Proxy error ${res.status}`);
+    }
+
+    return (await res.json()) as ProxyResult;
+  }
+  throw new Error('Prilis mnoho pozadavku (429). Zkuste to pozdeji.');
+}
+
+// ---------------------------------------------------------------------------
+// Client-side data processing (mirrors server-side processStats)
+// ---------------------------------------------------------------------------
+
+interface OrderItem {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+  unitPrice: number;
+  textualAmount: string;
+}
+
+interface ProductStats {
+  n: string; ta: string; c0: string; c1: string; c2: string;
+  ts: number; tq: number; to: number; ap: number; mp: number; xp: number;
+  fd: string; ld: string;
+  h: Record<string, [number, number, number]>;
+}
+
+interface StatsData {
+  p: Record<string, ProductStats>;
+  mo: Record<string, [number, number]>;
+}
+
+function r2(n: number) { return Math.round(n * 100) / 100; }
+function toMonth(d: string) { return d.slice(0, 7); }
+
+function processStats(
+  orders: Record<string, { date: string; amount: number; items: OrderItem[] }>,
+  categories: Record<string, { l1: string; l2: string; l3: string }>,
+): StatsData {
+  const p: Record<string, ProductStats> = {};
+  const mo: Record<string, [number, number]> = {};
+  const DEFAULT = { l1: 'Uncategorized', l2: '', l3: '' };
+
+  for (const order of Object.values(orders)) {
+    const month = toMonth(order.date);
+    if (!mo[month]) mo[month] = [0, 0];
+    mo[month][0] += 1;
+    mo[month][1] += order.amount;
+
+    const seen = new Set<string>();
+    for (const item of order.items) {
+      const pid = String(item.id);
+      const cat = categories[pid] ?? DEFAULT;
+      const up = item.unitPrice > 0 ? item.unitPrice : item.quantity > 0 ? item.price / item.quantity : 0;
+
+      if (!p[pid]) {
+        p[pid] = { n: item.name, ta: item.textualAmount, c0: cat.l1, c1: cat.l2, c2: cat.l3,
+          ts: 0, tq: 0, to: 0, ap: 0, mp: Infinity, xp: -Infinity, fd: month, ld: month, h: {} };
+      }
+      const prod = p[pid];
+      prod.tq += item.quantity;
+      prod.ts += item.price;
+      if (up < prod.mp) prod.mp = up;
+      if (up > prod.xp) prod.xp = up;
+      if (month < prod.fd) prod.fd = month;
+      if (month > prod.ld) prod.ld = month;
+      if (!prod.h[month]) prod.h[month] = [0, 0, 0];
+      prod.h[month][0] += item.quantity;
+      prod.h[month][1] += item.price;
+      if (!seen.has(pid)) { seen.add(pid); prod.to += 1; prod.h[month][2] += 1; }
+    }
+  }
+
+  for (const prod of Object.values(p)) {
+    prod.ts = r2(prod.ts);
+    prod.ap = prod.tq > 0 ? r2(prod.ts / prod.tq) : 0;
+    if (!isFinite(prod.mp)) prod.mp = 0;
+    if (!isFinite(prod.xp)) prod.xp = 0;
+    prod.mp = r2(prod.mp);
+    prod.xp = r2(prod.xp);
+    for (const m of Object.keys(prod.h)) prod.h[m][1] = r2(prod.h[m][1]);
+  }
+  return { p, mo };
+}
+
+// ---------------------------------------------------------------------------
+// Client-side fetch orchestration
+// ---------------------------------------------------------------------------
+
+type ProgressFn = (msg: string, pct: number) => void;
+
+async function fetchAllData(
+  email: string,
+  password: string,
+  onProgress: ProgressFn,
+): Promise<StatsData> {
+  // 1. Login
+  onProgress('Prihlasovani...', 2);
+  const loginRes = await proxyCall('/services/frontend-service/login', {
+    method: 'POST',
+    body: { email, password, name: '' },
+  });
+
+  const loginData = loginRes.data as { status: number; messages?: { content: string }[] };
+  if (loginData.status === 401) {
+    throw new Error('Neplatne prihlasovaci udaje. Zkontrolujte prosim svuj email a heslo.');
+  }
+  if (loginData.status !== 200) {
+    throw new Error(loginData.messages?.[0]?.content ?? 'Prihlaseni selhalo');
+  }
+
+  const cookies = loginRes.cookies ?? '';
+
+  // 2. Fetch all delivered orders (paginated)
+  onProgress('Stahovani objednavek...', 5);
+  const allOrders: Array<{
+    id: string;
+    orderTime: string;
+    priceComposition: { total: { amount: number } };
+  }> = [];
+  let offset = 0;
+
+  while (true) {
+    const res = await proxyCall(
+      `/api/v3/orders/delivered?offset=${offset}&limit=${PAGE_SIZE}`,
+      { cookies },
+    );
+    const page = res.data as typeof allOrders;
+    if (!page || page.length === 0) break;
+    allOrders.push(...page);
+    onProgress(`Stahovani objednavek: ${allOrders.length}`, 5 + (allOrders.length / 10));
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+    await sleep(RATE_LIMIT_MS);
+  }
+
+  // 3. Enrich orders with items
+  const ordersRecord: Record<string, { date: string; amount: number; items: OrderItem[] }> = {};
+  const allProductIds = new Set<number>();
+
+  for (let i = 0; i < allOrders.length; i++) {
+    const order = allOrders[i];
+    const pct = 15 + (i / allOrders.length) * 60;
+    onProgress(`Zpracovani objednavek: ${i + 1}/${allOrders.length}`, pct);
+
+    await sleep(RATE_LIMIT_MS);
+    const res = await proxyCall(`/api/v3/orders/${order.id}`, { cookies });
+    const detail = res.data as {
+      items?: Array<{
+        id: number;
+        name: string;
+        amount: number;
+        priceComposition: { total: { amount: number }; unit: { amount: number } };
+        textualAmount: string;
+      }>;
+    };
+
+    const items: OrderItem[] = (detail.items ?? []).map((it) => {
+      allProductIds.add(it.id);
+      return {
+        id: it.id,
+        name: it.name,
+        quantity: it.amount,
+        price: it.priceComposition.total.amount,
+        unitPrice: it.priceComposition.unit.amount,
+        textualAmount: it.textualAmount,
+      };
+    });
+
+    ordersRecord[order.id] = {
+      date: order.orderTime,
+      amount: order.priceComposition.total.amount,
+      items,
+    };
+  }
+
+  // 4. Fetch product categories
+  const categories: Record<string, { l1: string; l2: string; l3: string }> = {};
+  const productIds = Array.from(allProductIds);
+
+  for (let i = 0; i < productIds.length; i += CATEGORY_BATCH_SIZE) {
+    const batch = productIds.slice(i, i + CATEGORY_BATCH_SIZE);
+    const pct = 75 + (i / productIds.length) * 20;
+    onProgress(`Stahovani kategorii: ${Math.min(i + CATEGORY_BATCH_SIZE, productIds.length)}/${productIds.length}`, pct);
+
+    for (const pid of batch) {
+      await sleep(RATE_LIMIT_MS);
+      try {
+        const res = await proxyCall(
+          `/api/v1/products/${pid}/categories`,
+          { cookies },
+        );
+        const cats = res.data as Array<{ level: number; name: string }>;
+        if (Array.isArray(cats)) {
+          categories[String(pid)] = {
+            l1: cats.find((c) => c.level === 1)?.name ?? '',
+            l2: cats.find((c) => c.level === 2)?.name ?? '',
+            l3: cats.find((c) => c.level === 3)?.name ?? '',
+          };
+        }
+      } catch {
+        // Skip products with no categories (404)
+      }
+    }
+  }
+
+  // 5. Logout (fire and forget)
+  proxyCall('/services/frontend-service/logout', { method: 'POST', cookies }).catch(() => {});
+
+  // 6. Process stats
+  onProgress('Zpracovani statistik...', 97);
+  return processStats(ordersRecord, categories);
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function LandingPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -46,6 +309,7 @@ export default function LandingPage() {
   const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState('');
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const abortRef = useRef(false);
 
   const openLightbox = (idx: number) => setLightboxIdx(idx);
   const closeLightbox = () => setLightboxIdx(null);
@@ -69,55 +333,29 @@ export default function LandingPage() {
     e.preventDefault();
     setPhase('loading');
     setError('');
-    setProgress('Prihlasovani...');
-    setProgressPct(0);
+    abortRef.current = false;
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const stats = await fetchAllData(email, password, (msg, pct) => {
+        if (abortRef.current) return;
+        setProgress(msg);
+        setProgressPct(Math.min(pct, 100));
       });
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response stream');
+      // Save stats and get permalink
+      setProgress('Ukladani...');
+      setProgressPct(98);
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        let currentEvent = '';
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            currentEvent = line.slice(7);
-          } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            if (currentEvent === 'progress') {
-              setProgress(data.message);
-              if (data.total > 0) {
-                setProgressPct(Math.round((data.current / data.total) * 100));
-              }
-            } else if (currentEvent === 'complete') {
-              router.push(data.url);
-              return;
-            } else if (currentEvent === 'error') {
-              setPhase('error');
-              setError(data.message);
-              return;
-            }
-          }
-        }
-      }
-    } catch {
+      const saveRes = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stats),
+      });
+      const { url } = (await saveRes.json()) as { url: string };
+      router.push(url);
+    } catch (err) {
       setPhase('error');
-      setError('Pripojeni selhalo. Zkuste to znovu.');
+      setError(err instanceof Error ? err.message : 'Neocekavana chyba');
     }
   }, [email, password, router]);
 
@@ -180,7 +418,7 @@ export default function LandingPage() {
                 <div className="progress-bar">
                   <div
                     className="progress-bar-fill"
-                    style={{ width: `${Math.max(progressPct, 5)}%` }}
+                    style={{ width: `${Math.max(progressPct, 2)}%` }}
                   />
                 </div>
               </div>
