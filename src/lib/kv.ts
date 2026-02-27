@@ -11,6 +11,8 @@ import * as path from 'path';
 interface KVStore {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown, options?: { ex?: number }): Promise<void>;
+  mget<T = unknown>(keys: string[]): Promise<(T | null)[]>;
+  mset(entries: Array<{ key: string; value: unknown; ex?: number }>): Promise<void>;
 }
 
 /** File-based KV for local development */
@@ -56,6 +58,16 @@ class LocalKV implements KVStore {
     }
     fs.writeFileSync(fp, JSON.stringify(entry));
   }
+
+  async mget<T = unknown>(keys: string[]): Promise<(T | null)[]> {
+    return Promise.all(keys.map((k) => this.get<T>(k)));
+  }
+
+  async mset(entries: Array<{ key: string; value: unknown; ex?: number }>): Promise<void> {
+    for (const e of entries) {
+      await this.set(e.key, e.value, e.ex ? { ex: e.ex } : undefined);
+    }
+  }
 }
 
 /** Redis KV — creates a fresh connection per operation for serverless safety */
@@ -91,6 +103,34 @@ class RedisKV implements KVStore {
       } else {
         await client.set(key, serialized);
       }
+    });
+  }
+
+  async mget<T = unknown>(keys: string[]): Promise<(T | null)[]> {
+    if (keys.length === 0) return [];
+    return this.withClient(async (client) => {
+      const values = await client.mGet(keys);
+      return values.map((v) => {
+        if (v === null) return null;
+        try { return JSON.parse(v) as T; }
+        catch { return v as unknown as T; }
+      });
+    });
+  }
+
+  async mset(entries: Array<{ key: string; value: unknown; ex?: number }>): Promise<void> {
+    if (entries.length === 0) return;
+    return this.withClient(async (client) => {
+      const pipeline = client.multi();
+      for (const e of entries) {
+        const serialized = JSON.stringify(e.value);
+        if (e.ex) {
+          pipeline.set(e.key, serialized, { EX: e.ex });
+        } else {
+          pipeline.set(e.key, serialized);
+        }
+      }
+      await pipeline.exec();
     });
   }
 }

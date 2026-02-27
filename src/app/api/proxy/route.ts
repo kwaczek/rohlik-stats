@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const preferredRegion = 'fra1';
+export const maxDuration = 60;
 
 const BASE_URL = 'https://www.rohlik.cz';
+const INTERNAL_DELAY_MS = 750;
 
 const DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -14,61 +16,120 @@ const DEFAULT_HEADERS: Record<string, string> = {
   Origin: 'https://www.rohlik.cz',
 };
 
-/**
- * Thin proxy to Rohlik API. Each call is one request — no timeout issues.
- * The browser orchestrates the full flow with delays.
- */
-export async function POST(req: NextRequest) {
-  const body = await req.json() as {
-    path: string;
-    method?: string;
-    body?: unknown;
-    cookies?: string;
-  };
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-  const url = `${BASE_URL}${body.path}`;
+async function rohlikFetch(
+  path: string,
+  method: string,
+  cookies: string,
+  clientIp?: string,
+  body?: unknown,
+): Promise<{ data: unknown; cookies: string; status: number }> {
   const headers: Record<string, string> = {
     ...DEFAULT_HEADERS,
     'Content-Type': 'application/json',
   };
+  if (cookies) headers['Cookie'] = cookies;
+  if (clientIp) headers['X-Forwarded-For'] = clientIp;
 
-  if (body.cookies) {
-    headers['Cookie'] = body.cookies;
-  }
-
-  const response = await fetch(url, {
-    method: body.method ?? 'GET',
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method,
     headers,
-    body: body.body ? JSON.stringify(body.body) : undefined,
+    body: body ? JSON.stringify(body) : undefined,
     redirect: 'manual',
   });
 
-  // Capture Set-Cookie headers and return them as JSON
   const setCookies = response.headers.getSetCookie();
-  const cookies = setCookies
-    .map((h) => h.split(';')[0].trim())
-    .join('; ');
-
-  const contentType = response.headers.get('content-type') ?? '';
+  const newCookies = setCookies.map((h) => h.split(';')[0].trim()).join('; ');
 
   if (response.status === 429) {
+    return { data: null, cookies: newCookies, status: 429 };
+  }
+
+  const ct = response.headers.get('content-type') ?? '';
+  if (!ct.includes('application/json')) {
+    return { data: null, cookies: newCookies, status: response.status };
+  }
+
+  const data = await response.json();
+  return { data, cookies: newCookies || cookies, status: response.status };
+}
+
+/**
+ * Proxy to Rohlik API.
+ *
+ * Supports single requests and batch mode for order details.
+ * Batch mode fetches multiple paths in sequence with internal delays,
+ * reducing the number of function invocations and Cloudflare scrutiny.
+ */
+export async function POST(req: NextRequest) {
+  const payload = await req.json() as {
+    // Single request
+    path?: string;
+    method?: string;
+    body?: unknown;
+    cookies?: string;
+    // Batch mode: fetch multiple paths in one call
+    batch?: string[];
+  };
+
+  const cookies = payload.cookies ?? '';
+
+  // Forward client IP so Cloudflare sees a residential Czech IP, not datacenter
+  const clientIp =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    undefined;
+
+  // Batch mode — fetch multiple order details in sequence
+  if (payload.batch) {
+    const results: Array<{ path: string; data: unknown; status: number }> = [];
+    let currentCookies = cookies;
+
+    for (let i = 0; i < payload.batch.length; i++) {
+      if (i > 0) await sleep(INTERNAL_DELAY_MS);
+
+      const path = payload.batch[i];
+      const result = await rohlikFetch(path, 'GET', currentCookies, clientIp);
+
+      if (result.status === 429) {
+        // Return partial results + flag that we got rate-limited
+        return NextResponse.json({
+          results,
+          rateLimited: true,
+          rateLimitedAt: i,
+          cookies: currentCookies,
+        });
+      }
+
+      if (result.cookies) currentCookies = result.cookies;
+      results.push({ path, data: result.data, status: result.status });
+    }
+
+    return NextResponse.json({ results, cookies: currentCookies });
+  }
+
+  // Single request mode
+  const result = await rohlikFetch(
+    payload.path!,
+    payload.method ?? 'GET',
+    cookies,
+    clientIp,
+    payload.body,
+  );
+
+  if (result.status === 429) {
     return NextResponse.json(
       { error: 'rate_limited', status: 429 },
       { status: 429 },
     );
   }
 
-  if (!contentType.includes('application/json')) {
-    return NextResponse.json(
-      { error: 'non_json', status: response.status },
-      { status: 502 },
-    );
-  }
-
-  const data = await response.json();
   return NextResponse.json({
-    data,
-    cookies: cookies || undefined,
-    status: response.status,
+    data: result.data,
+    cookies: result.cookies || undefined,
+    status: result.status,
   });
 }

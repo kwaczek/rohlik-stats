@@ -41,9 +41,7 @@ const SCREENSHOTS = [
 // Client-side proxy helpers
 // ---------------------------------------------------------------------------
 
-const RATE_LIMIT_MS = 200;
 const PAGE_SIZE = 50;
-const CATEGORY_BATCH_SIZE = 20;
 const MAX_429_RETRIES = 5;
 
 function sleep(ms: number) {
@@ -215,76 +213,113 @@ async function fetchAllData(
     onProgress(`Stahovani objednavek: ${allOrders.length}`, 5 + (allOrders.length / 10));
     if (page.length < PAGE_SIZE) break;
     offset += PAGE_SIZE;
-    await sleep(RATE_LIMIT_MS);
+    await sleep(1000);
   }
 
-  // 3. Enrich orders with items
+  // 3. Enrich orders with items (batched — 10 per proxy call)
   const ordersRecord: Record<string, { date: string; amount: number; items: OrderItem[] }> = {};
   const allProductIds = new Set<number>();
+  const BATCH_SIZE = 10;
 
-  for (let i = 0; i < allOrders.length; i++) {
-    const order = allOrders[i];
-    const pct = 15 + (i / allOrders.length) * 60;
-    onProgress(`Zpracovani objednavek: ${i + 1}/${allOrders.length}`, pct);
+  for (let batchStart = 0; batchStart < allOrders.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, allOrders.length);
+    const pct = 15 + (batchStart / allOrders.length) * 60;
+    onProgress(`Zpracovani objednavek: ${batchStart}/${allOrders.length}`, pct);
 
-    await sleep(RATE_LIMIT_MS);
-    const res = await proxyCall(`/api/v3/orders/${order.id}`, { cookies });
-    const detail = res.data as {
-      items?: Array<{
-        id: number;
-        name: string;
-        amount: number;
-        priceComposition: { total: { amount: number }; unit: { amount: number } };
-        textualAmount: string;
-      }>;
-    };
+    const batchPaths = allOrders
+      .slice(batchStart, batchEnd)
+      .map((o) => `/api/v3/orders/${o.id}`);
 
-    const items: OrderItem[] = (detail.items ?? []).map((it) => {
-      allProductIds.add(it.id);
-      return {
-        id: it.id,
-        name: it.name,
-        quantity: it.amount,
-        price: it.priceComposition.total.amount,
-        unitPrice: it.priceComposition.unit.amount,
-        textualAmount: it.textualAmount,
+    // Batch proxy call with retry on rate limit
+    let batchRes: { results?: Array<{ path: string; data: unknown; status: number }>; rateLimited?: boolean };
+
+    for (let retry = 0; retry <= MAX_429_RETRIES; retry++) {
+      const res = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch: batchPaths, cookies }),
+      });
+      batchRes = await res.json();
+
+      if (batchRes.rateLimited) {
+        const wait = 30 + retry * 15;
+        onProgress(`Rohlik omezil pozadavky, cekam ${wait}s... (pokus ${retry + 1}/${MAX_429_RETRIES})`, pct);
+        await sleep(wait * 1000);
+        continue;
+      }
+      break;
+    }
+
+    // Process batch results
+    for (let j = 0; j < (batchRes!.results?.length ?? 0); j++) {
+      const order = allOrders[batchStart + j];
+      const detail = batchRes!.results![j].data as {
+        items?: Array<{
+          id: number;
+          name: string;
+          amount: number;
+          priceComposition: { total: { amount: number }; unit: { amount: number } };
+          textualAmount: string;
+        }>;
       };
-    });
 
-    ordersRecord[order.id] = {
-      date: order.orderTime,
-      amount: order.priceComposition.total.amount,
-      items,
-    };
+      const items: OrderItem[] = (detail?.items ?? []).map((it) => {
+        allProductIds.add(it.id);
+        return {
+          id: it.id,
+          name: it.name,
+          quantity: it.amount,
+          price: it.priceComposition.total.amount,
+          unitPrice: it.priceComposition.unit.amount,
+          textualAmount: it.textualAmount,
+        };
+      });
+
+      ordersRecord[order.id] = {
+        date: order.orderTime,
+        amount: order.priceComposition.total.amount,
+        items,
+      };
+    }
+
+    // Pause between batches to avoid Cloudflare rate limiting
+    await sleep(2000);
   }
 
-  // 4. Fetch product categories
-  const categories: Record<string, { l1: string; l2: string; l3: string }> = {};
-  const productIds = Array.from(allProductIds);
+  // 4. Fetch product categories (with Redis caching — only uncached products hit Rohlik)
+  let categories: Record<string, { l1: string; l2: string; l3: string }> = {};
+  let remainingIds = Array.from(allProductIds);
+  const CAT_BATCH_SIZE = 50; // Larger batches since most will be cache hits
 
-  for (let i = 0; i < productIds.length; i += CATEGORY_BATCH_SIZE) {
-    const batch = productIds.slice(i, i + CATEGORY_BATCH_SIZE);
-    const pct = 75 + (i / productIds.length) * 20;
-    onProgress(`Stahovani kategorii: ${Math.min(i + CATEGORY_BATCH_SIZE, productIds.length)}/${productIds.length}`, pct);
+  while (remainingIds.length > 0) {
+    const batch = remainingIds.slice(0, CAT_BATCH_SIZE);
+    const fetched = Object.keys(categories).length;
+    const total = allProductIds.size;
+    const pct = 75 + (fetched / Math.max(total, 1)) * 20;
+    onProgress(`Stahovani kategorii: ${fetched}/${total}`, pct);
 
-    for (const pid of batch) {
-      await sleep(RATE_LIMIT_MS);
-      try {
-        const res = await proxyCall(
-          `/api/v1/products/${pid}/categories`,
-          { cookies },
-        );
-        const cats = res.data as Array<{ level: number; name: string }>;
-        if (Array.isArray(cats)) {
-          categories[String(pid)] = {
-            l1: cats.find((c) => c.level === 1)?.name ?? '',
-            l2: cats.find((c) => c.level === 2)?.name ?? '',
-            l3: cats.find((c) => c.level === 3)?.name ?? '',
-          };
-        }
-      } catch {
-        // Skip products with no categories (404)
+    for (let retry = 0; retry <= MAX_429_RETRIES; retry++) {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds: batch, cookies }),
+      });
+      const data = await res.json();
+
+      categories = { ...categories, ...data.categories };
+
+      if (data.rateLimited) {
+        const wait = 30 + retry * 15;
+        onProgress(`Rohlik omezil pozadavky, cekam ${wait}s...`, pct);
+        await sleep(wait * 1000);
+        // Retry with only the remaining uncached IDs
+        remainingIds = data.remaining ?? [];
+        continue;
       }
+
+      // Success — move to next batch
+      remainingIds = remainingIds.slice(CAT_BATCH_SIZE);
+      break;
     }
   }
 
