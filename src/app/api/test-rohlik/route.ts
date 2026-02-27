@@ -15,11 +15,20 @@ export async function GET() {
       body: JSON.stringify({ email: 'test@test.cz', password: 'test', name: '' }),
     });
 
+    // Check cookie support
+    const setCookieHeaders = res.headers.getSetCookie();
+    const allHeaders: Record<string, string> = {};
+    res.headers.forEach((v, k) => { allHeaders[k] = v; });
+
     const text = await res.text();
     return new Response(JSON.stringify({
       status: res.status,
       contentType: res.headers.get('content-type'),
-      bodyPreview: text.substring(0, 500),
+      setCookieCount: setCookieHeaders.length,
+      setCookieHeaders: setCookieHeaders.map(c => c.substring(0, 80)),
+      allHeaderKeys: Object.keys(allHeaders),
+      nodeVersion: process.version,
+      bodyPreview: text.substring(0, 300),
     }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
