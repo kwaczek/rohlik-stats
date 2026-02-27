@@ -5,7 +5,7 @@ import { processStats } from '@/lib/process-stats';
 import * as crypto from 'crypto';
 
 export const runtime = 'nodejs'; // Need Node.js for cookie support
-export const maxDuration = 60; // Hobby plan allows up to 60s
+export const maxDuration = 300; // Fluid compute: Hobby allows up to 300s
 
 /**
  * Transform raw API result into the shape processStats expects.
@@ -118,8 +118,10 @@ export async function POST(req: NextRequest) {
               'Neplatne prihlasovaci udaje. Zkontrolujte prosim svuj email a heslo.',
           });
         } else {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          console.error('Generate API error:', errMsg);
           sendEvent('error', {
-            message: 'Doslo k neocekavane chybe. Zkuste to prosim znovu.',
+            message: `Doslo k chybe: ${errMsg}`,
           });
         }
       } finally {

@@ -58,55 +58,49 @@ class LocalKV implements KVStore {
   }
 }
 
-/** Lazy-loaded Redis for production */
-let _redis: KVStore | null = null;
-
-async function getRedis(): Promise<KVStore> {
-  if (!_redis) {
+/** Redis KV — creates a fresh connection per operation for serverless safety */
+class RedisKV implements KVStore {
+  private async withClient<R>(fn: (client: import('redis').RedisClientType) => Promise<R>): Promise<R> {
     const { createClient } = await import('redis');
     const client = createClient({ url: process.env.REDIS_URL });
     await client.connect();
-    _redis = {
-      get: async <T = unknown>(key: string) => {
-        const val = await client.get(key);
-        if (val === null) return null;
-        try {
-          return JSON.parse(val) as T;
-        } catch {
-          return val as unknown as T;
-        }
-      },
-      set: async (key: string, value: unknown, options?: { ex?: number }) => {
-        const serialized = JSON.stringify(value);
-        if (options?.ex) {
-          await client.set(key, serialized, { EX: options.ex });
-        } else {
-          await client.set(key, serialized);
-        }
-      },
-    };
+    try {
+      return await fn(client as import('redis').RedisClientType);
+    } finally {
+      await client.disconnect();
+    }
   }
-  return _redis;
+
+  async get<T = unknown>(key: string): Promise<T | null> {
+    return this.withClient(async (client) => {
+      const val = await client.get(key);
+      if (val === null) return null;
+      try {
+        return JSON.parse(val) as T;
+      } catch {
+        return val as unknown as T;
+      }
+    });
+  }
+
+  async set(key: string, value: unknown, options?: { ex?: number }): Promise<void> {
+    return this.withClient(async (client) => {
+      const serialized = JSON.stringify(value);
+      if (options?.ex) {
+        await client.set(key, serialized, { EX: options.ex });
+      } else {
+        await client.set(key, serialized);
+      }
+    });
+  }
 }
 
 /** Exported KV instance — automatically picks local or Redis based on env */
 function createKV(): KVStore {
-  const isLocal = !process.env.REDIS_URL;
-
-  if (isLocal) {
+  if (!process.env.REDIS_URL) {
     return new LocalKV();
   }
-
-  return {
-    get: async <T = unknown>(key: string) => {
-      const store = await getRedis();
-      return store.get<T>(key);
-    },
-    set: async (key: string, value: unknown, options?: { ex?: number }) => {
-      const store = await getRedis();
-      return store.set(key, value, options);
-    },
-  };
+  return new RedisKV();
 }
 
 export const kv = createKV();
