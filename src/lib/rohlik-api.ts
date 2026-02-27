@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 const BASE_URL = 'https://www.rohlik.cz';
-const RATE_LIMIT_MS = 200;
+const RATE_LIMIT_MS = 500;
 const PAGE_SIZE = 50;
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -120,22 +120,34 @@ export class RohlikAPI {
       headers['Cookie'] = this.cookies.join('; ');
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      redirect: 'manual',
-    });
+    // Retry with backoff on 429
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        redirect: 'manual',
+      });
 
-    // If we get a redirect or non-JSON response, the session may have expired
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.includes('application/json')) {
-      const preview = await response.text();
-      throw new RohlikAPIError(
-        `Non-JSON response (${response.status} ${contentType}): ${preview.substring(0, 100)}`,
-      );
+      if (response.status === 429 && attempt < MAX_RETRIES) {
+        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
+        await sleep(delay);
+        continue;
+      }
+
+      // Check for non-JSON response
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        const preview = await response.text();
+        throw new RohlikAPIError(
+          `Non-JSON response (${response.status} ${contentType}): ${preview.substring(0, 100)}`,
+        );
+      }
+
+      return { data: (await response.json()) as T, response };
     }
 
-    return { data: (await response.json()) as T, response };
+    throw new RohlikAPIError(`Request to ${url} failed after ${MAX_RETRIES} retries (429)`);
   }
 
   // -----------------------------------------------------------------------
