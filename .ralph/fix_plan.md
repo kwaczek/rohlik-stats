@@ -17,7 +17,7 @@
 ## Phase 3: Local Testing
 - [x] Test the app locally with `npm run dev` — verify the landing page loads, login form works, and API routes respond. Check that the local file-based KV works (no Redis needed for dev).
 - [x] Test Rohlik API proxy locally — use the test credentials from `.env` to verify login flow works from localhost (no IP throttling). Document any issues in this task's notes.
-- [ ] Test full stats generation flow locally — login, fetch orders, process stats, view dashboard. Verify all tabs work (Overview, Categories, Products). If Rohlik throttles even localhost, note the behavior.
+- [x] Test full stats generation flow locally — login, fetch orders, process stats, view dashboard. Verify all tabs work (Overview, Categories, Products). If Rohlik throttles even localhost, note the behavior. **RESULT**: Full flow works from localhost. 484 orders fetched, 2110 categories downloaded, permalink generated. All tabs (Overview, Categories, Products) and Product Detail view work correctly. No Rohlik throttling from localhost. Total flow took ~15 minutes due to rate-limiting delays.
 
 ## Phase 4: Deploy to Railway
 - [ ] Deploy to Railway using the CLI. Run: `railway init --name rohlik-stats` to create the project, then `railway service create --name web`. Set env vars using `railway variables set` for: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, NODE_ENV=production, PORT=3000. Then deploy with `railway up`. Get the public URL with `railway domain`. Verify deployment succeeds.
