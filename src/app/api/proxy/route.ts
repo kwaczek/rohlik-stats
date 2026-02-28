@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ProxyAgent, fetch as undiciFetch } from 'undici';
 
 export const runtime = 'nodejs';
 
 const BASE_URL = 'https://www.rohlik.cz';
 const INTERNAL_DELAY_MS = 750;
+const RESIDENTIAL_PROXY_URL = process.env.RESIDENTIAL_PROXY_URL;
 
 const DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -13,6 +15,11 @@ const DEFAULT_HEADERS: Record<string, string> = {
   Referer: 'https://www.rohlik.cz/',
   Origin: 'https://www.rohlik.cz',
 };
+
+let proxyAgent: ProxyAgent | null = null;
+if (RESIDENTIAL_PROXY_URL) {
+  proxyAgent = new ProxyAgent(RESIDENTIAL_PROXY_URL);
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -32,12 +39,38 @@ async function rohlikFetch(
   if (cookies) headers['Cookie'] = cookies;
   if (clientIp) headers['X-Forwarded-For'] = clientIp;
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const url = `${BASE_URL}${path}`;
+  const fetchOptions: Record<string, unknown> = {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    redirect: 'manual',
-  });
+  };
+
+  let response: Response;
+  if (proxyAgent) {
+    // Use undici fetch with ProxyAgent for residential proxy
+    const undiciResponse = await undiciFetch(url, {
+      ...fetchOptions,
+      dispatcher: proxyAgent,
+    } as Parameters<typeof undiciFetch>[1]);
+    // Convert undici response to standard Response-like interface
+    const responseBody = await undiciResponse.text();
+    const responseHeaders = new Headers();
+    for (const [key, value] of undiciResponse.headers) {
+      responseHeaders.append(key, value);
+    }
+    response = new Response(responseBody, {
+      status: undiciResponse.status,
+      statusText: undiciResponse.statusText,
+      headers: responseHeaders,
+    });
+  } else {
+    // Direct fetch for local dev (no proxy)
+    response = await fetch(url, {
+      ...fetchOptions,
+      redirect: 'manual',
+    } as RequestInit);
+  }
 
   const setCookies = response.headers.getSetCookie();
   const newCookies = setCookies.map((h) => h.split(';')[0].trim()).join('; ');
