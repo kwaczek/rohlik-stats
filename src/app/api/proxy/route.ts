@@ -24,7 +24,7 @@ async function rohlikFetch(
   cookies: string,
   clientIp?: string,
   body?: unknown,
-): Promise<{ data: unknown; cookies: string; status: number }> {
+): Promise<{ data: unknown; cookies: string; status: number; error?: string }> {
   const headers: Record<string, string> = {
     ...DEFAULT_HEADERS,
     'Content-Type': 'application/json',
@@ -48,7 +48,7 @@ async function rohlikFetch(
 
   const ct = response.headers.get('content-type') ?? '';
   if (!ct.includes('application/json')) {
-    return { data: null, cookies: newCookies, status: response.status };
+    return { data: null, cookies: newCookies, status: response.status, error: 'cloudflare_blocked' };
   }
 
   const data = await response.json();
@@ -129,5 +129,6 @@ export async function POST(req: NextRequest) {
     data: result.data,
     cookies: result.cookies || undefined,
     status: result.status,
+    ...(result.error ? { error: result.error } : {}),
   });
 }

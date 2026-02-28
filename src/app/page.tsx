@@ -183,6 +183,10 @@ async function fetchAllData(
     body: { email, password, name: '' },
   });
 
+  if (!loginRes.data) {
+    throw new Error('Rohlik server je momentalne nedostupny. Zkuste to pozdeji nebo z jineho pripojeni.');
+  }
+
   const loginData = loginRes.data as { status: number; messages?: { content: string }[] };
   if (loginData.status === 401) {
     throw new Error('Neplatne prihlasovaci udaje. Zkontrolujte prosim svuj email a heslo.');
