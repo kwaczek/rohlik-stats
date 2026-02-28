@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import * as crypto from 'crypto';
 
-export const preferredRegion = 'fra1';
-
 /**
  * Save processed stats and return a permalink ID.
  * Called by the browser after client-side data processing.

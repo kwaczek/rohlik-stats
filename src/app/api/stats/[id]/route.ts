@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 
-export const preferredRegion = 'fra1'; // Frankfurt — close to Redis in eu-central-1
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

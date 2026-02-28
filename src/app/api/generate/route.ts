@@ -4,9 +4,7 @@ import { RohlikAPI, InvalidCredentialsError } from '@/lib/rohlik-api';
 import { processStats } from '@/lib/process-stats';
 import * as crypto from 'crypto';
 
-export const runtime = 'nodejs'; // Need Node.js for cookie support
-export const maxDuration = 300; // Fluid compute: Hobby allows up to 300s
-export const preferredRegion = 'fra1'; // Frankfurt — closest to Czech Republic
+export const runtime = 'nodejs';
 
 /**
  * Transform raw API result into the shape processStats expects.

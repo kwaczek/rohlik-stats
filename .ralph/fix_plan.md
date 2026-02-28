@@ -7,7 +7,7 @@
 - [x] Update `next.config.ts` — remove any Vercel-specific config (preferredRegion, etc.). Make it platform-agnostic. Set `output: "standalone"` for Docker deployment.
 - [x] Update `src/app/api/proxy/route.ts` — remove Vercel-specific `preferredRegion` and `maxDuration` exports. These are Vercel-only and will error on Railway.
 - [x] Update `src/app/api/categories/route.ts` — remove Vercel-specific `preferredRegion` and `maxDuration` exports.
-- [ ] Update any other API routes that use Vercel-specific exports — check `save/route.ts`, `stats/[id]/route.ts`, `generate/route.ts` for `preferredRegion` or `maxDuration` and remove them.
+- [x] Update any other API routes that use Vercel-specific exports — check `save/route.ts`, `stats/[id]/route.ts`, `generate/route.ts` for `preferredRegion` or `maxDuration` and remove them.
 
 ## Phase 2: Redis Migration
 - [ ] Update `src/lib/kv.ts` — the current `RedisKV` class uses the `redis` npm package with `REDIS_URL`. Add support for Upstash Redis as an alternative: if `UPSTASH_REDIS_REST_URL` is set, use `@upstash/redis` REST client instead. Keep the `redis` package path as fallback for standard Redis. This lets us use the shared Upstash instance.
