@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@upstash/redis": "^1.36.3",
     "chart.js": "^4.5.1",
     "next": "16.1.6",
     "react": "19.2.3",
