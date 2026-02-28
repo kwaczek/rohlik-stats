@@ -4,7 +4,7 @@
 - [x] Create `Dockerfile` — multi-stage build: install deps, build Next.js, run production server with `npm start`. Expose PORT env var. Use Node 20 alpine base.
 - [x] Create `railway.toml` — Railway deployment config with build command, start command, health check path `/api/health`.
 - [x] Add health check endpoint `src/app/api/health/route.ts` — returns `{ status: "ok", timestamp }`. Simple GET endpoint.
-- [ ] Update `next.config.ts` — remove any Vercel-specific config (preferredRegion, etc.). Make it platform-agnostic. Set `output: "standalone"` for Docker deployment.
+- [x] Update `next.config.ts` — remove any Vercel-specific config (preferredRegion, etc.). Make it platform-agnostic. Set `output: "standalone"` for Docker deployment.
 - [ ] Update `src/app/api/proxy/route.ts` — remove Vercel-specific `preferredRegion` and `maxDuration` exports. These are Vercel-only and will error on Railway.
 - [ ] Update `src/app/api/categories/route.ts` — remove Vercel-specific `preferredRegion` and `maxDuration` exports.
 - [ ] Update any other API routes that use Vercel-specific exports — check `save/route.ts`, `stats/[id]/route.ts`, `generate/route.ts` for `preferredRegion` or `maxDuration` and remove them.
