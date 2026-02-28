@@ -21,7 +21,7 @@
 
 ## Phase 4: Deploy to Railway
 - [x] Deploy to Railway using the CLI. Run: `railway init --name rohlik-stats` to create the project, then `railway service create --name web`. Set env vars using `railway variables set` for: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, NODE_ENV=production, PORT=3000. Then deploy with `railway up`. Get the public URL with `railway domain`. Verify deployment succeeds. **RESULT**: Deployed successfully. Project created, web service with env vars set, `railway up` built and deployed. Public URL: https://web-production-23d1c.up.railway.app — health endpoint returns OK, landing page returns 200.
-- [ ] Test deployed app — curl the health endpoint and landing page on the Railway URL. Check if Rohlik API proxy works from Railway's IP (not throttled like Vercel). Use `railway logs` to debug any issues.
+- [x] Test deployed app — curl the health endpoint and landing page on the Railway URL. Check if Rohlik API proxy works from Railway's IP (not throttled like Vercel). Use `railway logs` to debug any issues. **RESULT**: Health endpoint returns `{"status":"ok"}`, landing page returns HTTP 200 (12KB, 0.68s). Categories API (Upstash Redis) works. Stats retrieval API works. However, Rohlik API proxy returns 403 — Cloudflare blocks Railway's datacenter IPs with a challenge page (same issue as Vercel). Railway IPs are NOT Czech-residential. The proxy works correctly but Rohlik/Cloudflare rejects requests from datacenter IPs regardless of provider.
 - [ ] Configure custom domain (if available) — add domain to Railway project if user has one. Otherwise skip this task and mark as done.
 
 ## Phase 5: Polish
