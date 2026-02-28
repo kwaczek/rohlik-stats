@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // empty' | grep -qiE '(rm -rf /|rm -rf ~|sudo |mkfs|dd if=|format |fdisk|diskutil|shutdown|reboot|kill -9 1|:(){ :|:& };:|chmod -R 777 /|chown -R|> /dev/|curl.*\\| ?sh|wget.*\\| ?sh|npm publish|git push.*--force|git push.*-f )' && echo 'BLOCKED: Dangerous command detected' >&2 && exit 1 || exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

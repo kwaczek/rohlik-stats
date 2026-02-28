@@ -48,6 +48,14 @@ rohlikcz_*.json
 next-env.d.ts
 
 # claude
-.claude/
 docs/plans/
 rohlik_stats.html
+
+# ralph runtime
+.ralph/logs/
+.ralph/.session_id
+.ralph/.call_count
+.ralph/.status
+.ralph/.last_reset
+.ralph/.loop_start_sha
+.ralph/live.log
