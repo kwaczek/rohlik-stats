@@ -59,3 +59,18 @@ rohlik_stats.html
 .ralph/.last_reset
 .ralph/.loop_start_sha
 .ralph/live.log
+.ralph/.claude_session_id
+.ralph/.response_analysis
+.ralph/.ralph_session
+.ralph/.ralph_session_history
+.ralph/.exit_signals
+.ralph/.circuit_breaker_state
+.ralph/.circuit_breaker_history
+.ralph/progress.json
+.ralph/status.json
+
+# playwright MCP logs
+.playwright-mcp/
+
+# claude local settings
+.claude/settings.local.json
