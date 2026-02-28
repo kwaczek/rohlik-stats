@@ -616,6 +616,14 @@ export default function LandingPage() {
           <span className="footer-sep">&middot;</span>
           <span>Hesla se neukladaji</span>
         </div>
+        <a
+          href="https://buymeacoffee.com/kwaczek"
+          target="_blank"
+          rel="noopener"
+          className="bmac-btn"
+        >
+          Buy me a coffee ☕
+        </a>
         <div className="footer-copy">
           Vytvoreno, protoze Rohlik tuto funkci nema a podpora ji opakovaně slibila.
           <br />
