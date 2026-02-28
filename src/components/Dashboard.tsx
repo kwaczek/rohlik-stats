@@ -243,6 +243,17 @@ export default function Dashboard({ data }: Props) {
           onShowDetail={showDetail}
         />
       )}
+
+      <footer className="dashboard-footer">
+        <a
+          href="https://buymeacoffee.com/kwaczek"
+          target="_blank"
+          rel="noopener"
+          className="bmac-btn"
+        >
+          Buy me a coffee ☕
+        </a>
+      </footer>
     </>
   );
 }
