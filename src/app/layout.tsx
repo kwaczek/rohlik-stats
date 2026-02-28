@@ -1,9 +1,27 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://rohlik-stats.cz';
+
 export const metadata: Metadata = {
-  title: 'Rohlik Stats — Analyza vasich nakupu',
-  description: 'Zobrazeni statistik nakupu z Rohlik.cz, ktere Rohlik sam nenabizi.',
+  metadataBase: new URL(BASE_URL),
+  title: 'Rohlik Stats — Statistiky nákupů na Rohlik.cz',
+  description:
+    'Analyzujte své nákupy na Rohlik.cz — měsíční útraty, oblíbené produkty, rozložení kategorií a historie cen. Statistiky, které Rohlík sám nenabízí.',
+  keywords: ['rohlik', 'statistiky', 'nákupy', 'rohlík', 'analýza', 'útrata', 'rohlik.cz', 'historie nákupů'],
+  openGraph: {
+    title: 'Rohlik Stats — Statistiky nákupů na Rohlik.cz',
+    description:
+      'Analyzujte své nákupy na Rohlik.cz — měsíční útraty, oblíbené produkty, rozložení kategorií a historie cen.',
+    type: 'website',
+    locale: 'cs_CZ',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Rohlik Stats — Statistiky nákupů na Rohlik.cz',
+    description:
+      'Analyzujte své nákupy na Rohlik.cz — měsíční útraty, oblíbené produkty, rozložení kategorií a historie cen.',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
