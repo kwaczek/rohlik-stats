@@ -26,5 +26,5 @@
 
 ## Phase 5: Polish
 - [x] Remove `.vercel/` directory and Vercel-specific files — clean up the project from Vercel deployment artifacts. **RESULT**: Removed `.vercel/` directory (README.txt, project.json) and `public/vercel.svg`. Updated 3 stale "Vercel KV" comments in source to "Redis".
-- [ ] Update README.md — update deployment instructions from Vercel to Railway. Update any references to Vercel KV.
+- [x] Update README.md — update deployment instructions from Vercel to Railway. Update any references to Vercel KV. **RESULT**: Replaced default create-next-app README with project-specific README covering: description, how it works, tech stack, local dev setup, env vars, testing, Railway deployment, architecture, and rate limiting.
 - [ ] Run full test suite and build — `npm test && npm run build`. Ensure everything passes cleanly.
