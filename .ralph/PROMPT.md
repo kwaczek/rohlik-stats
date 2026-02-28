@@ -110,6 +110,9 @@ At the end of each loop, output:
 - Credentials are NEVER stored — one-time use only
 - Run `npm run build` to verify no TS errors before committing
 
+### Rohlik API Note
+Fetching order data from Rohlik is SLOW — hundreds of orders with 750ms delay between batches + potential 429 retries. A full stats generation can take 10-20 minutes. When testing with Playwright, use very long timeouts (600000ms+) and wait patiently for data to load. Do NOT treat slow loading as a failure.
+
 ### Platform Note (Raspberry Pi)
 This project runs on a Raspberry Pi (ARM64, 16GB RAM). Builds are SLOW.
 - Use `timeout 600` (10 min) for `npm run build` commands
