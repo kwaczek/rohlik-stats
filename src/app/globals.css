@@ -26,7 +26,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .quick-btn:hover,.quick-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 
 /* Tabs */
-.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tabs-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;border-bottom:1px solid var(--border);gap:12px}
+.tabs{display:flex;gap:4px;padding-bottom:0}
 .tab{
   padding:10px 20px;cursor:pointer;font-size:14px;font-weight:500;color:var(--text2);
   border-bottom:2px solid transparent;transition:all .15s;
@@ -488,11 +489,11 @@ tr:hover{background:var(--card2)}
   transform: translateY(-1px);
 }
 
-.dashboard-footer {
-  text-align: center;
-  padding: 32px 0 16px;
-  margin-top: 24px;
-  border-top: 1px solid var(--border);
+.bmac-btn-sm {
+  padding: 5px 14px;
+  font-size: 13px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .footer-copy {

@@ -204,20 +204,30 @@ export default function Dashboard({ data }: Props) {
         </div>
       </div>
 
-      <div className="tabs">
-        {([
-          ['overview', 'Prehled'],
-          ['categories', 'Kategorie'],
-          ['products', 'Produkty'],
-        ] as const).map(([key, label]) => (
-          <div
-            key={key}
-            className={`tab${activeTab === key ? ' active' : ''}`}
-            onClick={() => handleTabSwitch(key as Tab)}
-          >
-            {label}
-          </div>
-        ))}
+      <div className="tabs-row">
+        <div className="tabs">
+          {([
+            ['overview', 'Prehled'],
+            ['categories', 'Kategorie'],
+            ['products', 'Produkty'],
+          ] as const).map(([key, label]) => (
+            <div
+              key={key}
+              className={`tab${activeTab === key ? ' active' : ''}`}
+              onClick={() => handleTabSwitch(key as Tab)}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+        <a
+          href="https://buymeacoffee.com/kwaczek"
+          target="_blank"
+          rel="noopener"
+          className="bmac-btn bmac-btn-sm"
+        >
+          Buy me a coffee ☕
+        </a>
       </div>
 
       {activeTab === 'overview' && (
@@ -244,16 +254,6 @@ export default function Dashboard({ data }: Props) {
         />
       )}
 
-      <footer className="dashboard-footer">
-        <a
-          href="https://buymeacoffee.com/kwaczek"
-          target="_blank"
-          rel="noopener"
-          className="bmac-btn"
-        >
-          Buy me a coffee ☕
-        </a>
-      </footer>
     </>
   );
 }
