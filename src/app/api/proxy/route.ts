@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
+import { getRandomProxy, markProxyFailed } from '@/lib/proxy-pool';
 
 export const runtime = 'nodejs';
 
 const BASE_URL = 'https://www.rohlik.cz';
 const INTERNAL_DELAY_MS = 750;
-const RESIDENTIAL_PROXY_URL = process.env.RESIDENTIAL_PROXY_URL;
+const MAX_PROXY_RETRIES = 3;
 
 const DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -15,11 +16,6 @@ const DEFAULT_HEADERS: Record<string, string> = {
   Referer: 'https://www.rohlik.cz/',
   Origin: 'https://www.rohlik.cz',
 };
-
-let proxyAgent: ProxyAgent | null = null;
-if (RESIDENTIAL_PROXY_URL) {
-  proxyAgent = new ProxyAgent(RESIDENTIAL_PROXY_URL);
-}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -46,46 +42,72 @@ async function rohlikFetch(
     body: body ? JSON.stringify(body) : undefined,
   };
 
-  let response: Response;
-  if (proxyAgent) {
-    // Use undici fetch with ProxyAgent for residential proxy
-    const undiciResponse = await undiciFetch(url, {
-      ...fetchOptions,
-      dispatcher: proxyAgent,
-    } as Parameters<typeof undiciFetch>[1]);
-    // Convert undici response to standard Response-like interface
-    const responseBody = await undiciResponse.text();
-    const responseHeaders = new Headers();
-    for (const [key, value] of undiciResponse.headers) {
-      responseHeaders.append(key, value);
+  // Try with proxy rotation (up to MAX_PROXY_RETRIES), then fall back to direct
+  for (let attempt = 0; attempt <= MAX_PROXY_RETRIES; attempt++) {
+    const proxy = await getRandomProxy();
+
+    let response: Response;
+    if (proxy) {
+      try {
+        const agent = new ProxyAgent(proxy.url);
+        const undiciResponse = await undiciFetch(url, {
+          ...fetchOptions,
+          dispatcher: agent,
+        } as Parameters<typeof undiciFetch>[1]);
+        // Convert undici response to standard Response
+        const responseBody = await undiciResponse.text();
+        const responseHeaders = new Headers();
+        for (const [key, value] of undiciResponse.headers) {
+          responseHeaders.append(key, value);
+        }
+        response = new Response(responseBody, {
+          status: undiciResponse.status,
+          statusText: undiciResponse.statusText,
+          headers: responseHeaders,
+        });
+      } catch (err) {
+        // Network error with this proxy — blacklist and retry
+        console.error(`[proxy] Proxy ${proxy.address} (${proxy.country}) failed:`, err);
+        markProxyFailed(proxy.address);
+        if (attempt < MAX_PROXY_RETRIES) continue;
+        // All retries exhausted — fall back to direct fetch
+        response = await fetch(url, {
+          ...fetchOptions,
+          redirect: 'manual',
+        } as RequestInit);
+      }
+    } else {
+      // No proxy available — direct fetch (local dev)
+      response = await fetch(url, {
+        ...fetchOptions,
+        redirect: 'manual',
+      } as RequestInit);
     }
-    response = new Response(responseBody, {
-      status: undiciResponse.status,
-      statusText: undiciResponse.statusText,
-      headers: responseHeaders,
-    });
-  } else {
-    // Direct fetch for local dev (no proxy)
-    response = await fetch(url, {
-      ...fetchOptions,
-      redirect: 'manual',
-    } as RequestInit);
+
+    const setCookies = response.headers.getSetCookie();
+    const newCookies = setCookies.map((h) => h.split(';')[0].trim()).join('; ');
+
+    if (response.status === 429) {
+      return { data: null, cookies: newCookies, status: 429 };
+    }
+
+    const ct = response.headers.get('content-type') ?? '';
+    if (!ct.includes('application/json')) {
+      // Cloudflare block — blacklist this proxy and retry with a different one
+      if (proxy && attempt < MAX_PROXY_RETRIES) {
+        console.warn(`[proxy] Cloudflare blocked proxy ${proxy.address} (${proxy.country}), retrying...`);
+        markProxyFailed(proxy.address);
+        continue;
+      }
+      return { data: null, cookies: newCookies, status: response.status, error: 'cloudflare_blocked' };
+    }
+
+    const data = await response.json();
+    return { data, cookies: newCookies || cookies, status: response.status };
   }
 
-  const setCookies = response.headers.getSetCookie();
-  const newCookies = setCookies.map((h) => h.split(';')[0].trim()).join('; ');
-
-  if (response.status === 429) {
-    return { data: null, cookies: newCookies, status: 429 };
-  }
-
-  const ct = response.headers.get('content-type') ?? '';
-  if (!ct.includes('application/json')) {
-    return { data: null, cookies: newCookies, status: response.status, error: 'cloudflare_blocked' };
-  }
-
-  const data = await response.json();
-  return { data, cookies: newCookies || cookies, status: response.status };
+  // Should not reach here, but safety fallback
+  return { data: null, cookies, status: 503, error: 'all_proxies_failed' };
 }
 
 /**
