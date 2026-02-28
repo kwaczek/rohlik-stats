@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 
 export const runtime = 'nodejs';
-export const preferredRegion = 'fra1';
-export const maxDuration = 60;
 
 const BASE_URL = 'https://www.rohlik.cz';
 const INTERNAL_DELAY_MS = 750;
