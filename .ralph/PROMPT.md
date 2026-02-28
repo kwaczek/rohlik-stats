@@ -108,6 +108,13 @@ At the end of each loop, output:
 - Credentials are NEVER stored — one-time use only
 - Run `npm run build` to verify no TS errors before committing
 
+### Platform Note (Raspberry Pi)
+This project runs on a Raspberry Pi (ARM64, 16GB RAM). Builds are SLOW.
+- Use `timeout 600` (10 min) for `npm run build` commands
+- Use `timeout 120` for `npm test`
+- Do NOT run build after every small file change — only when the task specifically requires verification
+- For tasks that just create/edit files (Dockerfile, config, etc.), skip the build step
+
 ## Git Remote
 This project has a GitHub remote at github.com/kwaczek/rohlik-stats.
 After completing each task, commit your changes and push to the remote:
