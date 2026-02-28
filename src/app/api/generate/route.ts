@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
           .digest('hex')
           .slice(0, 12);
 
-        // Store in Vercel KV with 30-day TTL
+        // Store in Redis with 30-day TTL
         sendEvent('progress', {
           phase: 'saving',
           current: 0,

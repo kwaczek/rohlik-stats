@@ -2,7 +2,7 @@
  * Data Processing Pipeline
  *
  * Transforms raw order data + product categories into a compact, dashboard-ready
- * StatsData structure. The output is stored in Vercel KV and consumed by the
+ * StatsData structure. The output is stored in Redis and consumed by the
  * frontend dashboard components.
  */
 

@@ -25,6 +25,6 @@
 - [x] Configure custom domain (if available) — add domain to Railway project if user has one. Otherwise skip this task and mark as done. **RESULT**: Skipped — no custom domain available. Railway-provided domain https://web-production-23d1c.up.railway.app is in use.
 
 ## Phase 5: Polish
-- [ ] Remove `.vercel/` directory and Vercel-specific files — clean up the project from Vercel deployment artifacts.
+- [x] Remove `.vercel/` directory and Vercel-specific files — clean up the project from Vercel deployment artifacts. **RESULT**: Removed `.vercel/` directory (README.txt, project.json) and `public/vercel.svg`. Updated 3 stale "Vercel KV" comments in source to "Redis".
 - [ ] Update README.md — update deployment instructions from Vercel to Railway. Update any references to Vercel KV.
 - [ ] Run full test suite and build — `npm test && npm run build`. Ensure everything passes cleanly.

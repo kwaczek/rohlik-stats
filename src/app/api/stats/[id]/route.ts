@@ -15,7 +15,7 @@ export async function GET(
     );
   }
 
-  // Fetch from Vercel KV
+  // Fetch from Redis
   const stats = await kv.get(`stats:${id}`);
 
   if (!stats) {
