@@ -10,7 +10,7 @@
 - [x] Update any other API routes that use Vercel-specific exports — check `save/route.ts`, `stats/[id]/route.ts`, `generate/route.ts` for `preferredRegion` or `maxDuration` and remove them.
 
 ## Phase 2: Redis Migration
-- [ ] Update `src/lib/kv.ts` — the current `RedisKV` class uses the `redis` npm package with `REDIS_URL`. Add support for Upstash Redis as an alternative: if `UPSTASH_REDIS_REST_URL` is set, use `@upstash/redis` REST client instead. Keep the `redis` package path as fallback for standard Redis. This lets us use the shared Upstash instance.
+- [x] Update `src/lib/kv.ts` — the current `RedisKV` class uses the `redis` npm package with `REDIS_URL`. Add support for Upstash Redis as an alternative: if `UPSTASH_REDIS_REST_URL` is set, use `@upstash/redis` REST client instead. Keep the `redis` package path as fallback for standard Redis. This lets us use the shared Upstash instance.
 - [ ] Install `@upstash/redis` package — `npm install @upstash/redis`. Verify build still works.
 - [ ] Run tests to verify KV changes don't break anything — `npm test`. Fix if needed.
 

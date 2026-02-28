@@ -1,8 +1,10 @@
 /**
  * KV store abstraction.
  *
- * In production (when REDIS_URL is set), uses Redis via the `redis` package.
- * In local development, uses a simple file-based store in .kv-local/.
+ * Priority order:
+ * 1. Upstash Redis (when UPSTASH_REDIS_REST_URL is set) — REST-based, works everywhere
+ * 2. Standard Redis (when REDIS_URL is set) — TCP-based via `redis` package
+ * 3. Local file-based store — for development without any Redis
  */
 
 import * as fs from 'fs';
@@ -67,6 +69,53 @@ class LocalKV implements KVStore {
     for (const e of entries) {
       await this.set(e.key, e.value, e.ex ? { ex: e.ex } : undefined);
     }
+  }
+}
+
+/** Upstash Redis KV — REST-based, no persistent connections needed */
+class UpstashKV implements KVStore {
+  private async getClient() {
+    const { Redis } = await import('@upstash/redis');
+    return new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
+  }
+
+  async get<T = unknown>(key: string): Promise<T | null> {
+    const client = await this.getClient();
+    const val = await client.get<T>(key);
+    return val ?? null;
+  }
+
+  async set(key: string, value: unknown, options?: { ex?: number }): Promise<void> {
+    const client = await this.getClient();
+    if (options?.ex) {
+      await client.set(key, value, { ex: options.ex });
+    } else {
+      await client.set(key, value);
+    }
+  }
+
+  async mget<T = unknown>(keys: string[]): Promise<(T | null)[]> {
+    if (keys.length === 0) return [];
+    const client = await this.getClient();
+    const values = await client.mget<T[]>(...keys);
+    return values.map((v) => v ?? null);
+  }
+
+  async mset(entries: Array<{ key: string; value: unknown; ex?: number }>): Promise<void> {
+    if (entries.length === 0) return;
+    const client = await this.getClient();
+    const pipeline = client.pipeline();
+    for (const e of entries) {
+      if (e.ex) {
+        pipeline.set(e.key, e.value, { ex: e.ex });
+      } else {
+        pipeline.set(e.key, e.value);
+      }
+    }
+    await pipeline.exec();
   }
 }
 
@@ -135,12 +184,15 @@ class RedisKV implements KVStore {
   }
 }
 
-/** Exported KV instance — automatically picks local or Redis based on env */
+/** Exported KV instance — picks Upstash, standard Redis, or local file store */
 function createKV(): KVStore {
-  if (!process.env.REDIS_URL) {
-    return new LocalKV();
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return new UpstashKV();
   }
-  return new RedisKV();
+  if (process.env.REDIS_URL) {
+    return new RedisKV();
+  }
+  return new LocalKV();
 }
 
 export const kv = createKV();
