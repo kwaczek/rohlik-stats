@@ -72,6 +72,16 @@ railway up
 railway domain
 ```
 
+### SEO: Google Search Console
+
+After configuring a custom domain, submit the sitemap to Google:
+
+1. Go to [Google Search Console](https://search.google.com/search-console)
+2. Add your domain and verify ownership (DNS TXT record)
+3. Submit sitemap URL: `https://yourdomain.cz/sitemap.xml`
+
+The app generates `/robots.txt` and `/sitemap.xml` automatically using the `NEXT_PUBLIC_BASE_URL` env var.
+
 ### Key Files
 
 - `Dockerfile` — Multi-stage Node 20 Alpine build
