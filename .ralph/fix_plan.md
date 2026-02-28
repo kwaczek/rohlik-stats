@@ -12,7 +12,7 @@
 ## Phase 2: Redis Migration
 - [x] Update `src/lib/kv.ts` — the current `RedisKV` class uses the `redis` npm package with `REDIS_URL`. Add support for Upstash Redis as an alternative: if `UPSTASH_REDIS_REST_URL` is set, use `@upstash/redis` REST client instead. Keep the `redis` package path as fallback for standard Redis. This lets us use the shared Upstash instance.
 - [x] Install `@upstash/redis` package — `npm install @upstash/redis`. Verify build still works.
-- [ ] Run tests to verify KV changes don't break anything — `npm test`. Fix if needed.
+- [x] Run tests to verify KV changes don't break anything — `npm test`. Fix if needed.
 
 ## Phase 3: Local Testing
 - [ ] Test the app locally with `npm run dev` — verify the landing page loads, login form works, and API routes respond. Check that the local file-based KV works (no Redis needed for dev).
