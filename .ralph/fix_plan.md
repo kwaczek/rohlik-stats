@@ -16,7 +16,7 @@
 
 ## Phase 3: Local Testing
 - [x] Test the app locally with `npm run dev` — verify the landing page loads, login form works, and API routes respond. Check that the local file-based KV works (no Redis needed for dev).
-- [ ] Test Rohlik API proxy locally — use the test credentials from `.env` to verify login flow works from localhost (no IP throttling). Document any issues in this task's notes.
+- [x] Test Rohlik API proxy locally — use the test credentials from `.env` to verify login flow works from localhost (no IP throttling). Document any issues in this task's notes.
 - [ ] Test full stats generation flow locally — login, fetch orders, process stats, view dashboard. Verify all tabs work (Overview, Categories, Products). If Rohlik throttles even localhost, note the behavior.
 
 ## Phase 4: Deploy to Railway
