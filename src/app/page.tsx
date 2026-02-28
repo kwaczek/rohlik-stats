@@ -211,8 +211,14 @@ async function fetchAllData(
       `/api/v3/orders/delivered?offset=${offset}&limit=${PAGE_SIZE}`,
       { cookies },
     );
+    if (!res.data) {
+      if (allOrders.length === 0) {
+        throw new Error('Rohlik server je momentalne nedostupny. Zkuste to pozdeji nebo z jineho pripojeni.');
+      }
+      break; // Got some orders before block — use what we have
+    }
     const page = res.data as typeof allOrders;
-    if (!page || page.length === 0) break;
+    if (page.length === 0) break;
     allOrders.push(...page);
     onProgress(`Stahovani objednavek: ${allOrders.length}`, 5 + (allOrders.length / 10));
     if (page.length < PAGE_SIZE) break;
@@ -257,7 +263,10 @@ async function fetchAllData(
     // Process batch results
     for (let j = 0; j < (batchRes!.results?.length ?? 0); j++) {
       const order = allOrders[batchStart + j];
-      const detail = batchRes!.results![j].data as {
+      const resultData = batchRes!.results![j].data;
+      if (!resultData) continue; // Skip if Cloudflare blocked this individual request
+
+      const detail = resultData as {
         items?: Array<{
           id: number;
           name: string;
@@ -267,7 +276,7 @@ async function fetchAllData(
         }>;
       };
 
-      const items: OrderItem[] = (detail?.items ?? []).map((it) => {
+      const items: OrderItem[] = (detail.items ?? []).map((it) => {
         allProductIds.add(it.id);
         return {
           id: it.id,
