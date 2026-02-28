@@ -1,3 +1,5 @@
+# YOUR TASK: Read `.ralph/fix_plan.md`, find the FIRST unchecked task (`- [ ]`), execute it, mark it done (`- [x]`), commit and push. Do NOT ask questions — just execute.
+
 # Rohlik Stats — Purchase Analytics for Rohlik.cz
 
 ## Project Description
