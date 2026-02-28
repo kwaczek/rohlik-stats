@@ -20,9 +20,9 @@
 - [ ] Test full stats generation flow locally — login, fetch orders, process stats, view dashboard. Verify all tabs work (Overview, Categories, Products). If Rohlik throttles even localhost, note the behavior.
 
 ## Phase 4: Deploy to Railway
-- [ ] Deploy to Railway — connect the GitHub repo (kwaczek/rohlik-stats) to Railway. Set environment variables: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `NODE_ENV=production`. Deploy and verify the app starts.
-- [ ] Test deployed app — verify the landing page loads on the Railway URL. Test login flow. Check if Rohlik API calls work from Railway's IP (this is the key test — Railway should not be throttled like Vercel).
-- [ ] Configure custom domain (if available) — add domain to Railway project if user has one. Otherwise skip.
+- [ ] Deploy to Railway using the CLI. Run: `railway init --name rohlik-stats` to create the project, then `railway service create --name web`. Set env vars using `railway variables set` for: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, NODE_ENV=production, PORT=3000. Then deploy with `railway up`. Get the public URL with `railway domain`. Verify deployment succeeds.
+- [ ] Test deployed app — curl the health endpoint and landing page on the Railway URL. Check if Rohlik API proxy works from Railway's IP (not throttled like Vercel). Use `railway logs` to debug any issues.
+- [ ] Configure custom domain (if available) — add domain to Railway project if user has one. Otherwise skip this task and mark as done.
 
 ## Phase 5: Polish
 - [ ] Remove `.vercel/` directory and Vercel-specific files — clean up the project from Vercel deployment artifacts.
