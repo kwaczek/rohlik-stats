@@ -43,6 +43,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             strategy="afterInteractive"
           />
         )}
+        <Script
+          src="https://backend-production-9d8a.up.railway.app/widget.js"
+          data-project-id="rohlik-stats"
+          data-api-url="https://backend-production-9d8a.up.railway.app"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
